@@ -108,7 +108,12 @@ if ($systemInformation.CsPartOfDomain) {
         Write-Host "Device is joined to AAD tenant: $tenantID"
         $isAAD = $true
     } else {
-        Write-Host "Not part of a AAD or AD, in a workgroup."
+        # Not part of a AAD or AD, so exit the script
+        if ($isAAD -eq $false -and $isAD -eq $false) {
+            Write-Host "Not part of a AAD or AD, in a workgroup."
+            Stop-Transcript
+            Exit 0
+        }
     }
 }
 
@@ -184,7 +189,7 @@ else
 {
     # Check to see if already scheduled
     $existingTask = Get-ScheduledTask -TaskName "RenameComputer" -ErrorAction SilentlyContinue
-    if ($existingTask -ne $null)
+    if ($null -ne $existingTask)
     {
         Write-Host "Scheduled task already exists."
         Stop-Transcript
