@@ -44,13 +44,11 @@ Note that if the device is joined to AD, there must be connectivity to the domai
 #> 
 
 [CmdletBinding()]
-# Create a parameter for the prefix to be supplied. If the prefix is supplied, the name will equal "Prefix-SerialNumber".
 Param(
-    [Parameter(Mandatory = $False)] [string] $Prefix = ""
-)
+    # Create a parameter for the prefix to be supplied. If the prefix is supplied, the name will equal "Prefix-SerialNumber".
+    [Parameter(Mandatory = $False)] [string] $Prefix = "",
 
-# Optional parameter to specify the full new name of the computer, if you don't want to use the default logic
-Param(
+    # Optional parameter to specify the full new name of the computer, if you don't want to use the default logic
     [Parameter(Mandatory = $False)] [string] $NewName = ""
 )
 
@@ -134,16 +132,22 @@ if ($goodToGo)
     Write-Host "Scheduled task unregistered."
 
     # Get the computer serial number
-    $serialNumber = $systemInformation.BiosSerialNumber 
-
-
-    # If a new name was specified, use that instead. If a prefix was supplied, use "Prefix-SerialNumber", otherwise use "UQ-SerialNumber"
-    if ($NewName -ne "") {
-        $newName = $NewName
-    } elseif ($Prefix -ne "") {
-        $newName = "$Prefix-$serialNumber"
+    # Stupid PowerShell 5.1 bug
+    if ($null -ne $details.BiosSerialNumber) {
+        $serialNumber = $details.BiosSerialNumber
     } else {
-        $newName = "UQ-$serialNumber"
+        $serialNumber = $details.BiosSeralNumber
+    }
+
+    # Determine the new computer name based on the provided parameters and serial number.
+    if ($NewName) {
+        $newName = $NewName
+    } elseif (-not $serialNumber) {
+        Write-Host "Unable to determine serial number, exiting."
+        Stop-Transcript
+        Exit 1
+    } else {
+        $newName = if ($Prefix) { "$Prefix-$serialNumber" } else { "UQ-$serialNumber" }
     }
 
     # Make sure the name isn't too long
@@ -194,10 +198,10 @@ else
     }
 
     # Create the scheduled task action
-    $action = New-ScheduledTaskAction -Execute "Powershell.exe" -Argument "-NoProfile -ExecutionPolicy bypass -WindowStyle Hidden -File $dest\RenameComputer.ps1"
+    $action = New-ScheduledTaskAction -Execute "Powershell.exe" -Argument "-NoProfile -ExecutionPolicy bypass -WindowStyle Hidden -File $dest\RenameComputer.ps1" -NewName "$newName"
 
     # Create the scheduled task trigger
-    $timespan = New-Timespan -minutes 5
+    $timespan = New-Timespan -minutes 5c
     $triggers = @()
     $triggers += New-ScheduledTaskTrigger -Daily -At 9am
     $triggers += New-ScheduledTaskTrigger -AtLogOn -RandomDelay $timespan
